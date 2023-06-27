@@ -22,28 +22,28 @@ pipeline {
             }
         }
         
-        // stage('OWASP Scan') {
-        //     steps {
-        //         dependencyCheck additionalArguments: '--scan ./ ', odcInstallation: 'DP'
-        //         dependencyCheckPublisher pattern: '**/dependency-check-report.xml'
-        //     }
-        // }
+        stage('OWASP Scan') {
+            steps {
+                dependencyCheck additionalArguments: '--scan ./ ', odcInstallation: 'DP'
+                dependencyCheckPublisher pattern: '**/dependency-check-report.xml'
+            }
+        }
         
-        // stage('Sonarqube') {
-        //     steps {
-        //         withSonarQubeEnv('sonar-server'){
-        //            sh ''' $SCANNER_HOME/bin/sonar-scanner -Dsonar.projectName=Shopping-Cart \
-        //            -Dsonar.java.binaries=. \
-        //            -Dsonar.projectKey=Shopping-Cart '''
-        //        }
-        //     }
-        // }
+        stage('Sonarqube') {
+            steps {
+                withSonarQubeEnv('sonar-server'){
+                   sh ''' $SCANNER_HOME/bin/sonar-scanner -Dsonar.projectName=Shopping-Cart \
+                   -Dsonar.java.binaries=. \
+                   -Dsonar.projectKey=Shopping-Cart '''
+               }
+            }
+        }
         
-        // stage('Build') {
-        //     steps {
-        //         sh "mvn clean package -DskipTests=true"
-        //     }
-        // }
+        stage('Build') {
+            steps {
+                sh "mvn clean package -DskipTests=true"
+            }
+        }
         
         // stage('Docker Build & Push') {
         //     steps {
