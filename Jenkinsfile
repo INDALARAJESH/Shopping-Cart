@@ -1,137 +1,72 @@
-pipeline{
+pipeline {
+    agent any
     
-    agent any 
+    tools{
+        jdk 'jdk11'
+        maven 'maven3'
+    }
     
+    environment {
+        SCANNER_HOME= tool 'sonar-scanner'
+        AWS_ACCESS_KEY_ID = credentials('AWS_ACCESS_KEY_ID')
+        AWS_SECRET_ACCESS_KEY = credentials('AWS_SECRET_ACCESS_KEY')
+        AWS_DEFAULT_REGION = "ap-south-1"
+    }
+
     stages {
+        stage('Git Checkout') {
+            steps {
+                git branch: 'main', changelog: false, poll: false, url: 'https://github.com/bhavanishankar26/Shopping-Cart.git'
+            }
+        }
         
-        stage('Git Checkout'){
-            
-            steps{
-                
-                script{
-                    
-                    git branch: 'main', url: 'https://github.com/INDALARAJESH/Shopping-Cart.git'
+        stage('Compile') {
+            steps {
+                sh "mvn clean compile"
+            }
+        }
+        
+        stage('Sonarqube Analysis') {
+            steps {
+                        sh ''' $SCANNER_HOME/bin/sonar-scanner -Dsonar.url=http://13.232.230.24:9000/ -Dsonar.login=squ_1cbd96bd9e4fc6f853f11ca0fc9d92dd6a66de61 -Dsonar.projectName=shopping-cart \
+                        -Dsonar.java.binaries=. \
+                        -Dsonar.projectKey=shopping-cart '''
+            }
+        }
+        stage('OWASP Scan') {
+            steps {
+                dependencyCheck additionalArguments: '--scan ./ ', odcInstallation: 'DP'
+                dependencyCheckPublisher pattern: '**/dependency-check-report.xml'
+            }
+        }
+        
+          stage('Build App') {
+            steps {
+                sh "mvn clean package -DskipTests=true"
+            }
+        }
+        
+        stage('Docker Build & Push') {
+            steps {
+                script {
+                    withDockerRegistry(credentialsId: 'Docker', toolName: 'docker') {
+                    sh "docker build -t shopping-cart:latest -f docker/Dockerfile ."
+                    sh "docker tag shopping-cart:latest gadebhavani26/shopping-cart:latest"
+                    sh "docker push gadebhavani26/shopping-cart:latest"
+                    }
                 }
             }
         }
-        // stage('UNIT testing'){
-            
-        //     steps{
-                
-        //         script{
-                    
-        //             sh 'mvn test'
-        //         }
-        //     }
-        // }
-        // stage('Integration testing'){
-            
-        //     steps{
-                
-        //         script{
-                    
-        //             sh 'mvn verify -DskipUnitTests'
-        //         }
-        //     }
-        // }
-        // stage('Maven build'){
-            
-        //     steps{
-                
-        //         script{
-                    
-        //             sh 'mvn clean install'
-        //         }
-        //     }
-        // }
-        // stage('Static code analysis'){
-            
-        //     steps{
-                
-        //         script{
-                    
-        //             withSonarQubeEnv(credentialsId: 'sonar-api') {
-                        
-        //                 sh 'mvn clean package sonar:sonar'
-        //             }
-        //            }
-                    
-        //         }
-        //     }
-        //     stage('Quality Gate Status'){
-                
-        //         steps{
-                    
-        //             script{
-                        
-        //                 waitForQualityGate abortPipeline: false, credentialsId: 'sonar-api'
-        //             }
-        //         }
-        //     }
+        stage("Deploy to EKS") {
+            steps {
+                script {
+                    dir('.') {
+                        sh "aws eks --region ap-south-1 update-kubeconfig --name terraform-eks-demo"
+                        sh "kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.8.0/deploy/static/provider/cloud/deploy.yaml"
+                        sh "kubectl apply -f deploymentservice.yml"
+                    }
+                }
+            }
         }
-        
+    }
 }
-
-// pipeline {
-//     agent any
-    // tools{
-    //     jdk  'jdk11'
-    //     maven  'maven3'
-    // }
-    
-    // environment{
-    //     SCANNER_HOME= tool 'sonar-scanner'
-    // }
-    
-    // stages {
-    //     stage('Git Checkout') {
-    //         steps {
-    //             git branch: 'main', url: 'https://github.com/INDALARAJESH/Shopping-Cart.git'
-    //         }
-    //     }
-        
-    //     stage('COMPILE') {
-    //         steps {
-    //             sh "mvn clean compile -DskipTests=true"
-    //         }
-    //     }
-        
-    //     stage('OWASP Scan') {
-    //         steps {
-    //             dependencyCheck additionalArguments: '--scan ./ ', odcInstallation: 'DP'
-    //             dependencyCheckPublisher pattern: '**/dependency-check-report.xml'
-    //         }
-        // }
-        
-        // stage('Sonarqube') {
-        //     steps {
-        //         withSonarQubeEnv('sonar-server'){
-        //            sh ''' $SCANNER_HOME/bin/sonar-scanner -Dsonar.projectName=Shopping-Cart \
-        //            -Dsonar.java.binaries=. \
-        //            -Dsonar.projectKey=Shopping-Cart '''
-        //        }
-        //     }
-        // }
-        
-        // stage('Build') {
-        //     steps {
-        //         sh "mvn clean package -DskipTests=true"
-        //     }
-        // }
-        
-        // stage('Docker Build & Push') {
-        //     steps {
-        //         script{
-        //             withDockerRegistry(credentialsId: '2fe19d8a-3d12-4b82-ba20-9d22e6bf1672', toolName: 'docker') {
-                        
-        //                 sh "docker build -t shopping-cart -f docker/Dockerfile ."
-        //                 sh "docker tag  shopping-cart adijaiswal/shopping-cart:latest"
-        //                 sh "docker push adijaiswal/shopping-cart:latest"
-        //             }
-        //         }
-        //     }
-        // }
-        
-        
-//     }
-// }
